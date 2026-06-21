@@ -1,3 +1,12 @@
-{"builds": [{ "src": "api/index.py", "use": "@vercel/python" }],
-  "routes": [{ "src": "/(.*)", "dest": "api/index.py" }]
+{
+  "headers": [
+    {
+      "source": "/latency",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "https://exam.sanand.workers.dev" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,POST" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
 }
