@@ -24,7 +24,7 @@ class RequestData(BaseModel):
 with open("q-vercel-latency.json") as f:
     TELEMETRY_DATA = json.load(f)
     #print(TELEMETRY_DATA)
-@app.post("/trial")
+@app.get("/trial")
 def trail():
     return {"message":" Trial run works 1234"}
 #def latency_info():
