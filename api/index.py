@@ -28,11 +28,14 @@ DATA_FILE = os.path.join(os.path.dirname(BASE_DIR), "q-vercel-latency.json")
 with open(DATA_FILE) as f:
     TELEMETRY_DATA = json.load(f)
     #print(TELEMETRY_DATA)
-@app.get("/trial")
-def trail():
-    return {"message":" Trial run works 1234"}
+#@app.get("/trial")
+#def trail():
+#    return {"message":" Trial run works 1234"}
 #def latency_info():
 #    return {"message": "Use POST /latency with JSON data"}
+@app.options("/latency")
+async def latency_options():
+    return Response(status_code=200)
 @app.post("/latency")
 async def analyze_latency(data: RequestData):
     results = {}
