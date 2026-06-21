@@ -1,70 +1,79 @@
 # api/index.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 import json
-import numpy as np
-import os
+import statistics
 
+# Create FastAPI app
 app = FastAPI()
 
-# Enable CORS for POST from any origin
+# ⭐ KEY FIX: Add CORS middleware THIS WAY
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allow ANY origin
+    allow_credentials=False,  # Must be False when allow_origins is "*"
+    allow_methods=["*"],  # Allow all methods (GET, POST, DELETE, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
-class RequestData(BaseModel):
-    regions: list[str]
-    threshold_ms: int
+# Load the sample telemetry data
+TELEMETRY_FILE = "q-vercel-latency.json"
 
-# Load telemetry data (in real use, this could be from a URL or env var)
-BASE_DIR = os.path.dirname(__file__)
-DATA_FILE = os.path.join(os.path.dirname(BASE_DIR), "q-vercel-latency.json")
+def load_telemetry():
+    with open(TELEMETRY_FILE, "r") as f:
+        return json.load(f)
 
-with open(DATA_FILE) as f:
-    TELEMETRY_DATA = json.load(f)
-    #print(TELEMETRY_DATA)
-#@app.get("/trial")
-#def trail():
-#    return {"message":" Trial run works 1234"}
-#def latency_info():
-#    return {"message": "Use POST /latency with JSON data"}
-@app.options("/latency")
-async def latency_options():
-    return Response(status_code=200)
-@app.post("/latency")
-async def analyze_latency(data: RequestData):
-    results = {}
+def calculate_metrics(records, threshold_ms):
+    latencies = records.get("latencies", [])
+    uptimes = records.get("uptimes", [])
     
-    for region in data.regions:
-        region_data = [r for r in TELEMETRY_DATA if r.get("region") == region]
-        latencies = [r["latency_ms"] for r in region_data if "latency_ms" in r]
-        uptimes = [r["uptime_pct"] for r in region_data]
-        
-        print(region_data, latencies,uptimes)        
-        if not latencies:
-            results[region] = {"error": "No data for region"}
-            continue
-            
-        # Calculate metrics
-        avg_latency = np.mean(latencies)
-        p95_latency = np.percentile(latencies, 95)
-        avg_uptime = np.mean(uptimes)
-        breaches = sum(1 for lat in latencies if lat > data.threshold_ms)
-        
-        results[region] = {
-            "avg_latency": round(avg_latency, 2),
-            "p95_latency": round(p95_latency, 2),
-            "avg_uptime": round(avg_uptime, 2),
-            "breaches": breaches
+    if not latencies:
+        return {
+            "avg_latency": 0,
+            "p95_latency": 0,
+            "avg_uptime": 0,
+            "breaches": 0
         }
     
-    return results
+    avg_latency = statistics.mean(latencies)
+    
+    # Calculate p95 (95th percentile)
+    sorted_latencies = sorted(latencies)
+    p95_index = int(0.95 * len(sorted_latencies))
+    if p95_index >= len(sorted_latencies):
+        p95_index = len(sorted_latencies) - 1
+    p95_latency = sorted_latencies[p95_index]
+    
+    avg_uptime = statistics.mean(uptimes) if uptimes else 0
+    
+    # Count breaches (latencies above threshold)
+    breaches = sum(1 for lat in latencies if lat > threshold_ms)
+    
+    return {
+        "avg_latency": avg_latency,
+        "p95_latency": p95_latency,
+        "avg_uptime": avg_uptime,
+        "breaches": breaches
+    }
+
+# POST endpoint - accepts both / and /latency
+@app.post("/")
+@app.post("/latency")
+async def analytics_endpoint(request: Request):
+    data = await request.json()
+    regions = data.get("regions", [])
+    threshold_ms = data.get("threshold_ms", 180)
+
+    telemetry = load_telemetry()
+    result = {}
+
+    for region in regions:
+        if region in telemetry:
+            result[region] = calculate_metrics(telemetry[region], threshold_ms)
+
+    return JSONResponse(content=result)
 
 @app.get("/")
-def read_root():
-    return {"message": "Hello, World! yogesh 1234"}
+async def read_root():
+    return {"message": "Latency Analytics Endpoint"}
