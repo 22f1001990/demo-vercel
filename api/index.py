@@ -21,7 +21,10 @@ class RequestData(BaseModel):
     threshold_ms: int
 
 # Load telemetry data (in real use, this could be from a URL or env var)
-with open("q-vercel-latency.json") as f:
+BASE_DIR = os.path.dirname(__file__)
+DATA_FILE = os.path.join(os.path.dirname(BASE_DIR), "q-vercel-latency.json")
+
+with open(DATA_FILE) as f:
     TELEMETRY_DATA = json.load(f)
     #print(TELEMETRY_DATA)
 @app.get("/trial")
